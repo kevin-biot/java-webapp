@@ -1,0 +1,56 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: java-webapp-pipeline
+  namespace: java-pipeline
+spec:
+  params:
+    - name: git-url
+      type: string
+    - name: git-revision
+      type: string
+      default: main
+    - name: image-url
+      type: string
+  workspaces:
+    - name: shared-workspace
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+        kind: Task
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: build
+      taskRef:
+        name: maven-build
+        kind: Task
+      runAfter:
+        - clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: image
+      taskRef:
+        name: kaniko
+        kind: Task
+      runAfter:
+        - build
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+        - name: CONTEXT
+          value: .
+        - name: DOCKERFILE
+          value: ./Dockerfile
+      workspaces:
+        - name: source
+          workspace: shared-workspace
